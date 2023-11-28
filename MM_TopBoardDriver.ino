@@ -26,8 +26,10 @@ const int Trig = 13;
 // Servo pin
 const int servoPin = 3;
 
-char direction = 'f';
-char act;
+char direction = 'p';
+char action;
+int distance;
+int perpendicular = 40; //for servo, can go +/- 15 (50 to 80)
 
 Servo myservo;
 
@@ -42,8 +44,8 @@ void setup() {
   pinMode(ENB, OUTPUT);
 
   // Set the ultrasonic sensor pins
-  pinMode(Echo, INPUT);
-  pinMode(Trig, OUTPUT);
+  //pinMode(Echo, INPUT);
+  //pinMode(Trig, OUTPUT);
 
   // Set the servo pin
   myservo.attach(servoPin);
@@ -157,34 +159,57 @@ void stop() {
 }
 
 /**
- * @brief Get the distance (cm) by the ultrasonic sensor
+ * @brief Get the distance (in) by the ultrasonic sensor
  * 
  * @return int The distance sensed by the ultrasonic sensor
  */
 int getDistance() {
   // trigger an ultrasonic wave for 20 microseconds
   digitalWrite(Trig, LOW);
-  delayMicroseconds(20);
+  delayMicroseconds(10);
   digitalWrite(Trig, HIGH);
-  delayMicroseconds(20);
+  delayMicroseconds(10);
   digitalWrite(Trig, LOW);
   // calculation converting time until signal returned to distance
-  float Fdistance = pulseIn(Echo, HIGH);
-  Fdistance = Fdistance / 58;
+  double Fdistance = pulseIn(Echo, HIGH);
+  Fdistance = Fdistance / 148.0;
   // returns an integer as the distance (in cm) sensed
-  return (int)Fdistance;
+  return Fdistance;
+}
+
+int panFind(){    //look to left, then right with ultrasonic sensor and return whether it needs to turn right (2) or left (1)
+  myservo.write(perpendicular-10);
+  delay(50);
+  int distLeft = getDistance();
+  myservo.write(perpendicular+10);
+  delay(50);
+  int distRight = getDistance();
+
+  myservo.write(perpendicular);     //return to normal
+
+  if (distLeft>distRight){
+    return 1;
+  }
+  else{
+    return 2;
+  }
 }
 
 void loop() {
-  int distance = getDistance(); // Get the distance from the ultrasonic sensor
-  //Serial.println(distance);
+
   rFRState = digitalRead(rFR);  //read right sensor
   rFLState = digitalRead(rFL);   //read left sensor 
 
-  Wire.beginTransmission(8); // transmit to device #8
-  Wire.write(distance);          
-  Wire.endTransmission();    // stop transmitting
-
+  Wire.requestFrom(8, 1);    // request 1 byte from device 8
+  while (Wire.available()) { // slave may send less than requested
+    char received = Wire.read();       // receive byte as a character
+    if (((received == 'f')||(received == 'p')) || (received == 'b')){     //determine if direction or action changed, then set proper variable
+      direction = received;
+    }
+    else{
+      action = received;
+    }
+  }
 
   /*
   Serial.print(rFRState);
@@ -192,33 +217,82 @@ void loop() {
   Serial.println(rFLState);
   */
 
-  /*
-  if(rFRState == HIGH){          //If right sensor is over reflective material
-    //Serial.println("Right Sensor");
-    
-    Wire.beginTransmission(8); // transmit to device #8
-    Wire.write("l");          //marker to determine what is being sent (right sensor high)
-    Wire.endTransmission();    // stop transmitting
-
-    swingTurnBackLeft(100);
-    delay(100);
-  }   
-  else if(rFLState == HIGH){     //If Left sensor above reflective material 
-    //Serial.println("Left Sensor") ;
-    Wire.beginTransmission(8); // transmit to device #8
-    Wire.write("l");          //marker to determine what is being sent (left sensor high)
-    Wire.endTransmission();    // stop transmitting
-
-    swingTurnBackRight(100);
-    delay(100);
-  }
-  else{
-    
-      forward(100);
-    
-  }*/
   
-  myservo.write(65);
+  if(rFRState == HIGH){             //If right sensor is over reflective material
+    Wire.beginTransmission(8); // transmit to device #8
+    Wire.write("r");          //marker to determine right sensor high
+    Wire.endTransmission();    // stop transmitting
 
-  delay(1000);
+    swingTurnBackLeft(200);
+    delay(50);
+  }   
+  else if(rFLState == HIGH){        //If Left sensor above reflective material 
+    Wire.beginTransmission(8); // transmit to device #8
+    Wire.write("l");          //marker to determine left sensor high
+    Wire.endTransmission();    // stop transmitting
+
+    swingTurnBackRight(200);
+    delay(50);
+  }
+  else if (action == 'i'){ //back right sensor detected
+    swingTurnLeft(200);
+    delay(50);
+    action = 'x';
+  }
+  else if (action == 'e'){ // back left sensor detected
+    swingTurnRight(200);
+    delay(50);
+    action = 'x';
+  }
+  
+  else if(action == 's'){
+    stop();
+  }
+
+  else{                             //no side sensor detection -> search until find an object, then move towards it
+    distance = getDistance(); //get distance front ultrasonic
+    Serial.println(distance);
+
+    //get direction from other board
+
+    if ((distance < 30) && (direction != 'b')){     //seeing something and going in this board's direction or panning
+      Wire.beginTransmission(8); // transmit to device #8
+      Wire.write("f");          //forward direction
+      Wire.endTransmission();    // stop transmitting
+      direction = 'f';
+
+      forward(100);
+    }
+    else if ((distance >= 30) && (direction == 'f')){     //detected in front but no longer see it
+      Wire.beginTransmission(8); // transmit to device #8
+      Wire.write("s");          //stop back
+      Wire.endTransmission();    // stop transmitting
+      stop();                   //stop front
+
+      if (panFind() == 1){
+        turnLeft(200);
+        delay(20);        //may have to decrease time or speed of turning, i just want about a 10 degree turn 
+      }
+      else{
+        turnRight(200);
+        delay(20);
+      }
+    }
+
+    else if (direction == 'b'){
+      //should be controlled by back board, this just follows along
+      back(100);
+    }
+    else{                           //default to panning mode
+      Wire.beginTransmission(8); // transmit to device #8
+      Wire.write("p");          //turn right, search
+      Wire.endTransmission();    // stop transmitting
+
+      turnRight(150);
+    }
+  }
+  
+  myservo.write(perpendicular);
+
+  delay(100);
 }

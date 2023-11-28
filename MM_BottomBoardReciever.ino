@@ -29,9 +29,11 @@ const int servoPin = 3;
 Servo myservo;
 
 int x = 0;
-int value = 0;
-char direction = 'f';
+char value;
+char direction = 'p';
 char action;
+int distance;
+int perpendicular = 70;   //ballpark, figure out later
 
 void setup() {
   // Configure all of these pins as outputs
@@ -61,13 +63,16 @@ void setup() {
 
 // function that executes whenever data is received from bottom board
 void receiveEvent(int bytes) {
-  x = Wire.read();
-  /*
+
   while (Wire.available()) { // loop through all
-    action = Wire.read();       // receive byte as a character
-    Serial.print(action);
+    char received = Wire.read();       // receive byte as a character
+    if (((received == 'f')||(received == 'p')) || (received == 'b')){
+      direction = received;
+    }
+    else{
+      action = received;
+    }
   }
-  Serial.println();*/
   //x = Wire.read();    // receive byte as an integer
 }
 
@@ -177,58 +182,110 @@ void stop() {
 }
 
 /**
- * @brief Get the distance (cm) by the ultrasonic sensor
+ * @brief Get the distance (in) by the ultrasonic sensor
  * 
  * @return int The distance sensed by the ultrasonic sensor
  */
 int getDistance() {
   // trigger an ultrasonic wave for 20 microseconds
   digitalWrite(Trig, LOW);
-  delayMicroseconds(20);
+  delayMicroseconds(10);
   digitalWrite(Trig, HIGH);
-  delayMicroseconds(20);
+  delayMicroseconds(10);
   digitalWrite(Trig, LOW);
   // calculation converting time until signal returned to distance
   float Fdistance = pulseIn(Echo, HIGH);
-  Fdistance = Fdistance / 58;
+  Fdistance = Fdistance / 148.0;
   // returns an integer as the distance (in cm) sensed
-  return (int)Fdistance;
+  return Fdistance;
+}
+
+int panFind(){    //look to left, then right with ultrasonic sensor and return whether it needs to turn right (2) or left (1)
+  myservo.write(perpendicular-10);
+  delay(50);
+  int distLeft = getDistance();
+  myservo.write(perpendicular+10);
+  delay(50);
+  int distRight = getDistance();
+
+  myservo.write(perpendicular);     //return to normal
+
+  if (distLeft>distRight){
+    return 1;
+  }
+  else{
+    return 2;
+  }
 }
 
 void loop() {
-  int distance = getDistance(); // Get the distance from the ultrasonic sensor
-  //Serial.println(distance);
+  
   rBRState = digitalRead(rBR);  //read right sensor
   rBLState = digitalRead(rBL);   //read left sensor 
 
   Serial.println(x);
 
-  /*
+  
   if(action == 'r'){
-    swingTurnBackLeft(100);
-    delay(100);
-    action = 'x';
+    swingTurnBackLeft(200);
+    delay(50);    //give time to clear the line
+    action = 'x';   //clear action
   }
   else if(action == 'l'){
-    swingTurnBackRight(100);
-    delay(100);
+    swingTurnBackRight(200);
+    delay(50);
     action = 'x';
   }
   else if(rBRState == HIGH){          //If right sensor is over reflective material
-    //Serial.println("Right Sensor");
-    
+    // swing turn forward left, tell front board to follow along with "i"
+    value = 'i';
+    swingTurnLeft(200);
+    delay(50);
   }   
   else if(rBLState == HIGH){     //If Left sensor above reflective material 
-    //Serial.println("Left Sensor") ;
-    
+    // swing turn forward right, tell front board to follow along with "e"
+    value = 'e';
+    swingTurnRight(200);
+    delay(50);
   }
+
+  else if(action == 's'){
+    stop();
+  }
+
   else{
-    if(direction == 'f'){
+    distance = getDistance(); // Get the distance from the ultrasonic sensor
+
+    if ((distance < 30) && (direction != 'f')){     //seeing something and going in this board's direction or panning
+      value = 'b';
+      direction = 'b';
+
+      back(100);
+    }
+    else if ((distance >= 30) && (direction == 'b')){     //detected in front but no longer see it
+      value = 's';
+      stop();                   //stop front
+
+      if (panFind() == 1){
+        turnLeft(200);
+        delay(20);        //may have to decrease time or speed of turning, i just want about a 10 degree turn 
+      }
+      else{
+        turnRight(200);
+        delay(20);
+      }
+    }
+    else if (direction == 'f'){
+      //should be controlled by front board, this just follows along
       forward(100);
     }
-  }*/
+    else{                           //default to panning mode
+      value = 'p';
+      turnRight(150);
+    }
+  }
 
-  myservo.write(40);
+  myservo.write(45);
 
   delay(100);
 }
