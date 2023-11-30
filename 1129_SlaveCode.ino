@@ -84,13 +84,17 @@ void loop()
   {
     case 'f':
       forward(255);
+      Serial.println("wahoo!");
+      break;
     case 'r':
       turnRight(255);
+      break;
     case 'l':
       turnLeft(255);
+      break;
     default:
       stop();
-    break;
+      break;
   }
 
   Serial.println(direction);

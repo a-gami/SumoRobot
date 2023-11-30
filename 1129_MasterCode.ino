@@ -118,7 +118,7 @@ void loop()
       spinDirection = 1;
       Serial.print(spinDirection);
       turnRight(255);
-      delay(800);
+      delay(500);
     }
     if(rSensorState == LOW)
     {
@@ -129,11 +129,11 @@ void loop()
       spinDirection = 0;
       Serial.print(spinDirection);
       turnLeft(255);
-      delay(800);
+      delay(500);
     }
   }
 
-  else if(distance > 20)
+  else if((distance > 20) || (distance == 0))
   {
     if(spinDirection == 0)
     {
