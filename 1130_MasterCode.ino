@@ -9,13 +9,15 @@ const int rLeftSensor = 4 ;                                 // Same (but differe
 int rRSensorState = 0 ;                                      // Initialize right side sensor variable, 0 meaning false/high
 int rLSensorState = 0 ;                                      // Same for left side
 
-int fRSensorState = 0 ;
+int fRSensorState = 0 ; //bools
 int fLSensorState = 0 ;
 
 int spinDirection = 0 ;                                     // Initialize spin direction, 0 meaning spin counterclockwise. Switched to either 0 or 1 based on ring contact
 float rDistance = 0 ;                                        // Initialize rear sensor distance to 0 inches
 
-int received[3] = {0};
+int fDistanceState = 0 ; // bool
+
+int received[3] = {0, 0, 0};
 
 // Speed control pins
 const int ENA = 6;            //right side
@@ -140,17 +142,18 @@ void swingTurnBackRight(int carSpeed) {
 
 void loop()
 {
-  Wire.requestFrom(8, 3);    // request 3 bytes from device 8
-  while (Wire.available()) 
+  Wire.requestFrom(8, 4);    // request 3 bytes from device 8
+
+  while (Wire.available())         //CONSIDER RAISING INDEX TO 4, ADDING NULL
   { // slave may send less than requested
-    received[0] = Wire.read();       // receive byte 1 as a character
+    received[0] = Wire.read();
     received[1] = Wire.read();
     received[2] = Wire.read();
     received[3] = Wire.read();
 
     fRSensorState = received[0] ;
     fLSensorState = received[1] ;
-    fDistance = received[2] ;
+    fDistanceState = received[2] ;
   }
 
   rDistance = getDistance();
@@ -161,40 +164,62 @@ void loop()
   rLSensorState = digitalRead(rLeftSensor);
   rRSensorState = digitalRead(rRightSensor);
 
-  if((rLSensorState == LOW) || (rRSensorState == LOW))
+  if(((rLSensorState == LOW) || (rRSensorState == LOW)) || ((fRSensorState == 1) || (fLSensorState == 1)))
   {
     if(rLSensorState == LOW)
     {
       Wire.beginTransmission(8); // transmit to device #8
-      Wire.write('r');          //marker to determine right sensor high
+      Wire.write('t');          //marker to determine right sensor high
       Wire.endTransmission();
-      Serial.print("r");
-      spinDirection = 1;
-      Serial.print(spinDirection);
-      turnRight(255);
+      Serial.println("t");
+      spinDirection = 0;
+      //Serial.print(spinDirection);
+      swingTurnRight(255);
       delay(500);
     }
     if(rRSensorState == LOW)
     {
       Wire.beginTransmission(8); // transmit to device #8
-      Wire.write('l');          //marker to determine right sensor high
+      Wire.write('o');          //marker to determine right sensor high
       Wire.endTransmission();
-      Serial.print("l");
+      Serial.println("o");
+      spinDirection = 1;
+      //Serial.print(spinDirection);
+      swingTurnLeft(255);
+      delay(500);
+    }
+    if(fRSensorState == 1)
+    {
+      Wire.beginTransmission(8);
+      Wire.write('w');
+      Wire.endTransmission();
+      Serial.println("w");
       spinDirection = 0;
-      Serial.print(spinDirection);
-      turnLeft(255);
+      //Serial.print(spinDirection);
+      swingTurnBackLeft(255);
+      delay(500);
+    }
+    if(fLSensorState == 1)
+    {
+      Wire.beginTransmission(8);
+      Wire.write('k');
+      Wire.endTransmission();
+      Serial.println("k");
+      spinDirection = 1;
+      //Serial.print(spinDirection);
+      swingTurnBackRight(255);
       delay(500);
     }
   }
 
-  else if((rDistance > 30) || (rDistance == 0))
+  else if((rDistance > 30 || rDistance == 0) && (fDistanceState == 0))
   {
     if(spinDirection == 0)
     {
       Wire.beginTransmission(8); // transmit to device #8
       Wire.write('l');          //marker to determine right sensor high
       Wire.endTransmission();
-      Serial.print("l");
+      Serial.println("l");
       turnLeft(255);
     }
     else if(spinDirection == 1)
@@ -202,18 +227,27 @@ void loop()
       Wire.beginTransmission(8); // transmit to device #8
       Wire.write('r');          //marker to determine right sensor high
       Wire.endTransmission();
-      Serial.print("r");
+      Serial.println("r");
       turnRight(255);
     }
   }
 
-  else
+  else if(fDistanceState == 1)
   {
     Wire.beginTransmission(8); // transmit to device #8
     Wire.write('f');          //marker to determine right sensor high
     Wire.endTransmission();
-    Serial.print("f");
+    Serial.println("f");
     forward(255);
+  }
+
+  else if(rDistance == 0)
+  {
+    Wire.beginTransmission(8);
+    Wire.write('b');
+    Wire.endTransmission();
+    Serial.println("b");
+    backward(255);
   }
 
   delay(25);
