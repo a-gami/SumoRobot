@@ -9,15 +9,15 @@ const int rLeftSensor = 4 ;                                 // Same (but differe
 int rRSensorState = 0 ;                                      // Initialize right side sensor variable, 0 meaning false/high
 int rLSensorState = 0 ;                                      // Same for left side
 
-int fRSensorState = 0 ; //bools
+int fRSensorState = 0 ; 
 int fLSensorState = 0 ;
 
 int spinDirection = 0 ;                                     // Initialize spin direction, 0 meaning spin counterclockwise. Switched to either 0 or 1 based on ring contact
 float rDistance = 0 ;                                        // Initialize rear sensor distance to 0 inches
 
-int fDistanceState = 0 ; // bool
+int fDistanceState = 0 ; 
 
-int received[3] = {0, 0, 0};
+int received[4] = {0, 0, 0, '\0'};
 
 // Speed control pins
 const int ENA = 6;            //right side
@@ -49,8 +49,7 @@ void setup()
     Wire.begin();
 }
 
-float getDistance()                                            // Function for measuring and calibrating frontal distance (inches)
-{
+float getDistance() {                                           // Function for measuring and calibrating frontal distance (inches)
     float echoTime ;                                            // Store time it takes for a pulse to bounce off an object and return
     float rDistance ;                                    // Store measured distance calculated from the echo time
 
@@ -65,8 +64,7 @@ float getDistance()                                            // Function for m
     return rDistance ; 
 }
 
-void forward(int carSpeed)  // Forward, cap at 255
-{
+void forward(int carSpeed){  // Forward, cap at 255
   // Setting Direction and Power Pins
   digitalWrite(IN1, HIGH);
   digitalWrite(IN2, LOW);
@@ -140,16 +138,14 @@ void swingTurnBackRight(int carSpeed) {
   analogWrite(ENB, 0.25 * carSpeed);
 }
 
-void loop()
-{
-  Wire.requestFrom(8, 4);    // request 3 bytes from device 8
+void loop(){
+  Wire.requestFrom(8, 4);    // request 4 bytes from device 8 (last should be null)
 
-  while (Wire.available())         //CONSIDER RAISING INDEX TO 4, ADDING NULL
-  { // slave may send less than requested
-    received[0] = Wire.read();
-    received[1] = Wire.read();
-    received[2] = Wire.read();
-    received[3] = Wire.read();
+  while (Wire.available()){ 
+    received[0] = int(Wire.read());
+    received[1] = int(Wire.read());   
+    received[2] = int(Wire.read());  // 1 or 0
+    received[3] = int(Wire.read());  //null
 
     fRSensorState = received[0] ;
     fLSensorState = received[1] ;
@@ -158,14 +154,15 @@ void loop()
 
   rDistance = getDistance();
 
-  Serial.print(rDistance);
-  Serial.println(" inches");
+  //Serial.print(rDistance);
+  //Serial.println(" inches");
+
+  Serial.println(received[1]);
 
   rLSensorState = digitalRead(rLeftSensor);
   rRSensorState = digitalRead(rRightSensor);
 
-  if(((rLSensorState == LOW) || (rRSensorState == LOW)) || ((fRSensorState == 1) || (fLSensorState == 1)))
-  {
+  if(((rLSensorState == LOW) || (rRSensorState == LOW)) || ((fRSensorState == 0) || (fLSensorState == 0))) {
     if(rLSensorState == LOW)
     {
       Wire.beginTransmission(8); // transmit to device #8
@@ -175,7 +172,7 @@ void loop()
       spinDirection = 0;
       //Serial.print(spinDirection);
       swingTurnRight(255);
-      delay(500);
+      delay(100);
     }
     if(rRSensorState == LOW)
     {
@@ -186,9 +183,9 @@ void loop()
       spinDirection = 1;
       //Serial.print(spinDirection);
       swingTurnLeft(255);
-      delay(500);
+      delay(100);
     }
-    if(fRSensorState == 1)
+    if(fRSensorState == 0)
     {
       Wire.beginTransmission(8);
       Wire.write('w');
@@ -197,9 +194,9 @@ void loop()
       spinDirection = 0;
       //Serial.print(spinDirection);
       swingTurnBackLeft(255);
-      delay(500);
+      delay(100);
     }
-    if(fLSensorState == 1)
+    if(fLSensorState == 0)
     {
       Wire.beginTransmission(8);
       Wire.write('k');
@@ -208,11 +205,11 @@ void loop()
       spinDirection = 1;
       //Serial.print(spinDirection);
       swingTurnBackRight(255);
-      delay(500);
+      delay(100);
     }
   }
 
-  else if((rDistance > 30 || rDistance == 0) && (fDistanceState == 0))
+  else if((rDistance > 25 || rDistance == 0) && (fDistanceState == 0))
   {
     if(spinDirection == 0)
     {
@@ -222,8 +219,8 @@ void loop()
       Serial.println("l");
       turnLeft(255);
     }
-    else if(spinDirection == 1)
-    {
+    //else if(spinDirection == 1){
+    else{
       Wire.beginTransmission(8); // transmit to device #8
       Wire.write('r');          //marker to determine right sensor high
       Wire.endTransmission();
@@ -232,8 +229,7 @@ void loop()
     }
   }
 
-  else if(fDistanceState == 1)
-  {
+  else if(fDistanceState == 1){
     Wire.beginTransmission(8); // transmit to device #8
     Wire.write('f');          //marker to determine right sensor high
     Wire.endTransmission();
@@ -241,8 +237,7 @@ void loop()
     forward(255);
   }
 
-  else if(rDistance == 0)
-  {
+  else if(rDistance < 25){
     Wire.beginTransmission(8);
     Wire.write('b');
     Wire.endTransmission();
