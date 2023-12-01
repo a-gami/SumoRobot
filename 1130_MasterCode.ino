@@ -15,9 +15,9 @@ int fLSensorState = 0 ;
 int spinDirection = 0 ;                                     // Initialize spin direction, 0 meaning spin counterclockwise. Switched to either 0 or 1 based on ring contact
 float rDistance = 0 ;                                        // Initialize rear sensor distance to 0 inches
 
-int fDistanceState = 0 ; 
+int fDistanceState = -1 ; 
 
-int received[4] = {0, 0, 0, '\0'};
+char received[4] = {0, 0, 0, '\0'};
 
 // Speed control pins
 const int ENA = 6;            //right side
@@ -31,7 +31,7 @@ const int IN4 = 7;            //back left motor (close to board)
 
 void setup()
 {
-    Serial.begin(9600) ;                                    // Set up serial connection with attached computer (pre-competition)
+    Serial.begin(9600);                                    // Set up serial connection with attached computer (pre-competition)
 
     pinMode(rTrigPin, OUTPUT);
     pinMode(rEchoPin, INPUT);
@@ -144,7 +144,7 @@ void loop(){
   while (Wire.available()){ 
     received[0] = int(Wire.read());
     received[1] = int(Wire.read());   
-    received[2] = int(Wire.read());  // 1 or 0
+    received[2] = int(Wire.read());  // 1 or -1
     received[3] = int(Wire.read());  //null
 
     fRSensorState = received[0] ;
@@ -156,13 +156,13 @@ void loop(){
 
   //Serial.print(rDistance);
   //Serial.println(" inches");
-
-  Serial.println(received[1]);
+  Serial.print(int(received[0]));
+  Serial.println(int(received[1]));
 
   rLSensorState = digitalRead(rLeftSensor);
   rRSensorState = digitalRead(rRightSensor);
 
-  if(((rLSensorState == LOW) || (rRSensorState == LOW)) || ((fRSensorState == 0) || (fLSensorState == 0))) {
+  if(((rLSensorState == LOW) || (rRSensorState == LOW)) || ((fRSensorState == -1) || (fLSensorState == -1))) {
     if(rLSensorState == LOW)
     {
       Wire.beginTransmission(8); // transmit to device #8
@@ -172,7 +172,7 @@ void loop(){
       spinDirection = 0;
       //Serial.print(spinDirection);
       swingTurnRight(255);
-      delay(100);
+      delay(200);
     }
     if(rRSensorState == LOW)
     {
@@ -183,9 +183,9 @@ void loop(){
       spinDirection = 1;
       //Serial.print(spinDirection);
       swingTurnLeft(255);
-      delay(100);
+      delay(200);
     }
-    if(fRSensorState == 0)
+    if(fRSensorState == -1)
     {
       Wire.beginTransmission(8);
       Wire.write('w');
@@ -194,9 +194,9 @@ void loop(){
       spinDirection = 0;
       //Serial.print(spinDirection);
       swingTurnBackLeft(255);
-      delay(100);
+      delay(200);
     }
-    if(fLSensorState == 0)
+    if(fLSensorState == -1)
     {
       Wire.beginTransmission(8);
       Wire.write('k');
@@ -205,11 +205,11 @@ void loop(){
       spinDirection = 1;
       //Serial.print(spinDirection);
       swingTurnBackRight(255);
-      delay(100);
+      delay(200);
     }
   }
 
-  else if((rDistance > 25 || rDistance == 0) && (fDistanceState == 0))
+  else if((rDistance > 25) && (fDistanceState != 1))
   {
     if(spinDirection == 0)
     {

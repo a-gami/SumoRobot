@@ -15,7 +15,7 @@ int fDistanceState = 0 ;
 
 char command;
 
-int sensorData[4] = {0, 0, 0, '\0'}; // Array to hold sensor states and distance
+char sensorData[4] = {0, 0, 0, '\0'}; // Array to hold sensor states and distance
 
 // Speed control pins
 const int ENA = 6;            //right side
@@ -52,7 +52,7 @@ void setup()
 // function that executes whenever data is requested by master
 void requestEvent() {
   //Wire.write((char*)sensorData, sizeof(sensorData)); // respond with message
-  Wire.write(byte(sensorData));
+  Wire.write(sensorData);
 }
 
 void receiveEvent(int bytes) {      //get data from master
@@ -160,7 +160,7 @@ void stop() {
 void loop(){
   fDistance = getDistance();    //get distance
 
-  if(fDistance > 25 || fDistance == 0)    //do not see something or !! -> issue with sensor, reads 0??
+  if(fDistance > 25 || fDistance == 0)   
   {
     fDistanceState = 0;   //front sensor 
   }
@@ -215,5 +215,5 @@ void loop(){
       break;
   }
 
-  delay(100);
+  delay(25);
 }
